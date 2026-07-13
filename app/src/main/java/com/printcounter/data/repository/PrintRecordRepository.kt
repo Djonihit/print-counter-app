@@ -2,24 +2,33 @@ package com.printcounter.data.repository
 
 import com.printcounter.data.dao.PrintRecordDao
 import com.printcounter.domain.model.DailyStatistics
+import com.printcounter.domain.model.FormatStatistics
 import com.printcounter.domain.model.PrintRecord
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 class PrintRecordRepository(private val printRecordDao: PrintRecordDao) {
     
     fun getAllRecords(): Flow<List<PrintRecord>> = printRecordDao.getAllRecords()
     
-    fun getRecentRecords(limit: Int): Flow<List<PrintRecord>> = printRecordDao.getRecentRecords(limit)
+    fun getRecordsByWorkType(workType: String): Flow<List<PrintRecord>> = 
+        printRecordDao.getRecordsByWorkType(workType)
     
-    suspend fun addPrintRecord(quantity: Int, description: String = "", deviceName: String = ""): Long {
+    fun getRecordsByFormat(workType: String, format: String): Flow<List<PrintRecord>> = 
+        printRecordDao.getRecordsByWorkTypeAndFormat(workType, format)
+    
+    suspend fun addRecord(
+        quantity: Int,
+        format: String,
+        workType: String,
+        description: String = "",
+        deviceName: String = ""
+    ): Long {
         val record = PrintRecord(
             quantity = quantity,
+            format = format,
+            workType = workType,
             description = description,
             deviceName = deviceName,
             timestamp = System.currentTimeMillis()
@@ -27,29 +36,37 @@ class PrintRecordRepository(private val printRecordDao: PrintRecordDao) {
         return printRecordDao.insert(record)
     }
     
-    suspend fun updatePrintRecord(record: PrintRecord) {
+    suspend fun updateRecord(record: PrintRecord) {
         printRecordDao.update(record)
     }
     
-    suspend fun deletePrintRecord(record: PrintRecord) {
+    suspend fun deleteRecord(record: PrintRecord) {
         printRecordDao.delete(record)
     }
     
-    fun getTotalPrints(): Flow<Int> = printRecordDao.getTotalPrints()
+    fun getTotalQuantity(): Flow<Int?> = printRecordDao.getTotalQuantity()
+    
+    suspend fun getTotalByWorkType(workType: String): Int =
+        printRecordDao.getTotalQuantityByWorkType(workType)
+    
+    suspend fun getTotalByFormat(workType: String, format: String): Int =
+        printRecordDao.getTotalQuantityByFormat(workType, format)
     
     suspend fun getDailyStatistics(date: LocalDate): DailyStatistics {
         val startOfDay = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val endOfDay = date.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() - 1
         
-        val totalPrints = printRecordDao.getTotalPrintsByDateRange(startOfDay, endOfDay)
-        val recordCount = printRecordDao.getRecordCountByDateRange(startOfDay, endOfDay)
-        val averagePerRecord = if (recordCount > 0) totalPrints.toDouble() / recordCount else 0.0
+        val totalPrints = printRecordDao.getTotalQuantityByDateRange("PRINT", startOfDay, endOfDay)
+        val totalEmbroidery = printRecordDao.getTotalQuantityByDateRange("EMBROIDERY", startOfDay, endOfDay)
+        val printRecordCount = printRecordDao.getRecordCountByDateRange("PRINT", startOfDay, endOfDay)
+        val embroideryRecordCount = printRecordDao.getRecordCountByDateRange("EMBROIDERY", startOfDay, endOfDay)
         
         return DailyStatistics(
             date = startOfDay,
             totalPrints = totalPrints,
-            recordCount = recordCount,
-            averagePerRecord = averagePerRecord
+            totalEmbroidery = totalEmbroidery,
+            printRecordCount = printRecordCount,
+            embroideryRecordCount = embroideryRecordCount
         )
     }
     

@@ -32,15 +32,33 @@ interface PrintRecordDao {
     @Query("SELECT * FROM print_records WHERE timestamp BETWEEN :startTime AND :endTime ORDER BY timestamp DESC")
     fun getRecordsByDateRange(startTime: Long, endTime: Long): Flow<List<PrintRecord>>
     
+    @Query("SELECT * FROM print_records WHERE workType = :workType ORDER BY timestamp DESC")
+    fun getRecordsByWorkType(workType: String): Flow<List<PrintRecord>>
+    
+    @Query("SELECT * FROM print_records WHERE workType = :workType AND format = :format ORDER BY timestamp DESC")
+    fun getRecordsByWorkTypeAndFormat(workType: String, format: String): Flow<List<PrintRecord>>
+    
     @Query("SELECT SUM(quantity) FROM print_records")
-    fun getTotalPrints(): Flow<Int>
+    fun getTotalQuantity(): Flow<Int?>
     
-    @Query("SELECT SUM(quantity) FROM print_records WHERE timestamp BETWEEN :startTime AND :endTime")
-    suspend fun getTotalPrintsByDateRange(startTime: Long, endTime: Long): Int
+    @Query("SELECT SUM(quantity) FROM print_records WHERE workType = :workType")
+    suspend fun getTotalQuantityByWorkType(workType: String): Int
     
-    @Query("SELECT COUNT(*) FROM print_records WHERE timestamp BETWEEN :startTime AND :endTime")
-    suspend fun getRecordCountByDateRange(startTime: Long, endTime: Long): Int
+    @Query("SELECT SUM(quantity) FROM print_records WHERE workType = :workType AND format = :format")
+    suspend fun getTotalQuantityByFormat(workType: String, format: String): Int
+    
+    @Query("SELECT SUM(quantity) FROM print_records WHERE workType = :workType AND timestamp BETWEEN :startTime AND :endTime")
+    suspend fun getTotalQuantityByDateRange(workType: String, startTime: Long, endTime: Long): Int
+    
+    @Query("SELECT COUNT(*) FROM print_records WHERE workType = :workType AND timestamp BETWEEN :startTime AND :endTime")
+    suspend fun getRecordCountByDateRange(workType: String, startTime: Long, endTime: Long): Int
+    
+    @Query("SELECT COUNT(*) FROM print_records WHERE workType = :workType AND format = :format")
+    suspend fun getRecordCountByFormat(workType: String, format: String): Int
     
     @Query("DELETE FROM print_records")
     suspend fun deleteAll()
+    
+    @Query("DELETE FROM print_records WHERE id = :id")
+    suspend fun deleteById(id: Int)
 }

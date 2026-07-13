@@ -13,8 +13,12 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 data class PrintCounterUiState(
-    val records: List<PrintRecord> = emptyList(),
+    val allRecords: List<PrintRecord> = emptyList(),
+    val printRecords: List<PrintRecord> = emptyList(),
+    val embroideryRecords: List<PrintRecord> = emptyList(),
+    val totalQuantity: Int = 0,
     val totalPrints: Int = 0,
+    val totalEmbroidery: Int = 0,
     val dailyStatistics: DailyStatistics? = null,
     val weeklyStatistics: List<DailyStatistics> = emptyList(),
     val monthlyStatistics: List<DailyStatistics> = emptyList(),
@@ -35,9 +39,8 @@ class PrintCounterViewModel(private val repository: PrintRecordRepository) : Vie
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                // Collect flows
                 repository.getAllRecords().collect { records ->
-                    _uiState.value = _uiState.value.copy(records = records)
+                    _uiState.value = _uiState.value.copy(allRecords = records)
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Unknown error")
@@ -46,29 +49,78 @@ class PrintCounterViewModel(private val repository: PrintRecordRepository) : Vie
         
         viewModelScope.launch {
             try {
-                repository.getTotalPrints().collect { total ->
-                    _uiState.value = _uiState.value.copy(totalPrints = total)
+                repository.getRecordsByWorkType("PRINT").collect { records ->
+                    _uiState.value = _uiState.value.copy(printRecords = records)
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Unknown error")
             }
         }
-    }
-    
-    fun addPrintRecord(quantity: Int, description: String = "", deviceName: String = "") {
+        
         viewModelScope.launch {
             try {
-                repository.addPrintRecord(quantity, description, deviceName)
+                repository.getRecordsByWorkType("EMBROIDERY").collect { records ->
+                    _uiState.value = _uiState.value.copy(embroideryRecords = records)
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Unknown error")
+            }
+        }
+        
+        viewModelScope.launch {
+            try {
+                repository.getTotalQuantity().collect { total ->
+                    _uiState.value = _uiState.value.copy(totalQuantity = total ?: 0)
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Unknown error")
+            }
+        }
+        
+        loadTotals()
+        loadDailyStatistics(LocalDate.now())
+        loadWeeklyStatistics()
+    }
+    
+    private fun loadTotals() {
+        viewModelScope.launch {
+            try {
+                val printTotal = repository.getTotalByWorkType("PRINT")
+                val embroideryTotal = repository.getTotalByWorkType("EMBROIDERY")
+                _uiState.value = _uiState.value.copy(
+                    totalPrints = printTotal,
+                    totalEmbroidery = embroideryTotal
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to load totals")
+            }
+        }
+    }
+    
+    fun addPrintRecord(quantity: Int, format: String, description: String = "") {
+        viewModelScope.launch {
+            try {
+                repository.addRecord(quantity, format, "PRINT", description)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to add record")
             }
         }
     }
     
-    fun deletePrintRecord(record: PrintRecord) {
+    fun addEmbroideryRecord(quantity: Int, format: String, description: String = "") {
         viewModelScope.launch {
             try {
-                repository.deletePrintRecord(record)
+                repository.addRecord(quantity, format, "EMBROIDERY", description)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to add record")
+            }
+        }
+    }
+    
+    fun deleteRecord(record: PrintRecord) {
+        viewModelScope.launch {
+            try {
+                repository.deleteRecord(record)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to delete record")
             }
